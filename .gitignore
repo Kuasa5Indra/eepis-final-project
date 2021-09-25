@@ -1,0 +1,2 @@
+# Prevent SSH key get commited
+*.pem
