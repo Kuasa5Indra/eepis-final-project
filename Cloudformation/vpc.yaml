@@ -238,8 +238,6 @@ Resources:
         InstanceType: t2.micro
         KeyName: debian-server
         SecurityGroupIds:
-      SecurityGroupIds: 
-        SecurityGroupIds:
           - !Ref InstanceSG
         UserData: IyEgL2Jpbi9iYXNoDQpzdWRvIGFwdCB1cGRhdGUgLXkNCnN1ZG8gYXB0IGluc3RhbGwgYXBhY2hlMiAteQ0Kc3VkbyBzeXN0ZW1jdGwgc3RhcnQgYXBhY2hlMg0Kc3VkbyBzeXN0ZW1jdGwgZW5hYmxlIGFwYWNoZTI=
       LaunchTemplateName: debian-server
