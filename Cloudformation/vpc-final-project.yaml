@@ -1,0 +1,460 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Code for High Availability Database Research
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/24 # Required
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: my-VPC
+  PublicSubnet1A:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: ap-southeast-1a
+      CidrBlock: 10.0.0.0/27 # Required
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: public-subnet-1a
+      VpcId: !Ref VPC # Required
+  PublicSubnet1B:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: ap-southeast-1b
+      CidrBlock: 10.0.0.32/27 # Required
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: public-subnet-1b
+      VpcId: !Ref VPC # Required
+  PrivateSubnet1A:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: ap-southeast-1a
+      CidrBlock: 10.0.0.64/27 # Required
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: private-subnet-1a
+      VpcId: !Ref VPC # Required
+  PrivateSubnet2A:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: ap-southeast-1a
+      CidrBlock: 10.0.0.96/27 # Required
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: private-subnet-2a
+      VpcId: !Ref VPC # Required
+  PrivateSubnet1B:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: ap-southeast-1b
+      CidrBlock: 10.0.0.128/27 # Required
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: private-subnet-1b
+      VpcId: !Ref VPC # Required
+  PrivateSubnet2B:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: ap-southeast-1b
+      CidrBlock: 10.0.0.160/27 # Required
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: private-subnet-2b
+      VpcId: !Ref VPC # Required
+  IGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: my-igw
+  AttachIGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    DependsOn: IGW
+    Properties:
+      InternetGatewayId: !Ref IGW
+      VpcId: !Ref VPC # Required
+  EIP1A:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: elastic-1a
+  EIP1B:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: elastic-1b
+  NATGW1A:
+    Type: AWS::EC2::NatGateway
+    DependsOn: EIP1A
+    Properties:
+      AllocationId: !GetAtt EIP1A.AllocationId
+      ConnectivityType: public
+      SubnetId: !Ref PublicSubnet1A # Required
+      Tags:
+        - Key: Name
+          Value: nat-gw-1a
+  NATGW1B:
+    Type: AWS::EC2::NatGateway
+    DependsOn: EIP1B
+    Properties:
+      AllocationId: !GetAtt EIP1B.AllocationId
+      ConnectivityType: public
+      SubnetId: !Ref PublicSubnet1B # Required
+      Tags:
+        - Key: Name
+          Value: nat-gw-1b
+  PublicRT:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: public-RT
+      VpcId: !Ref VPC # Required
+  Private1aRT:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: private-1a-RT
+      VpcId: !Ref VPC # Required
+  Private1bRT:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: private-1b-RT
+      VpcId: !Ref VPC # Required
+  PublicRouteToIGW:
+    Type: AWS::EC2::Route
+    DependsOn: IGW
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref IGW
+      RouteTableId: !Ref PublicRT # Required
+  Private1aRouteToNAT:
+    Type: AWS::EC2::Route
+    DependsOn: NATGW1A
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGW1A
+      RouteTableId: !Ref Private1aRT # Required
+  Private1bRouteToNAT:
+    Type: AWS::EC2::Route
+    DependsOn: NATGW1B
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGW1B
+      RouteTableId: !Ref Private1bRT # Required
+  PublicSubnet1ARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRT # Required
+      SubnetId: !Ref PublicSubnet1A # Required
+  PublicSubnet1BRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRT # Required
+      SubnetId: !Ref PublicSubnet1B # Required
+  PrivateSubnet1ARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref Private1aRT # Required
+      SubnetId: !Ref PrivateSubnet1A # Required
+  PrivateSubnet2ARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref Private1aRT # Required
+      SubnetId: !Ref PrivateSubnet2A # Required
+  PrivateSubnet1BRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref Private1bRT # Required
+      SubnetId: !Ref PrivateSubnet1B # Required
+  PrivateSubnet2BRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref Private1bRT # Required
+      SubnetId: !Ref PrivateSubnet2B # Required
+  BastionSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Bastion Host # Required
+      GroupName: bastion-sg
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: Bastion-SG
+      VpcId: !Ref VPC
+  AppSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Application # Required
+      GroupName: app-sg
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: App-SG
+      VpcId: !Ref VPC
+  DatabaseSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Database # Required
+      GroupName: database-sg
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: Database-SG
+      VpcId: !Ref VPC
+  ELBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Application Load Balancing
+      GroupName: alb-sg
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: ALB-SG
+      VpcId: !Ref VPC
+  BastionICMPRuleSG:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      CidrIp: 0.0.0.0/0
+      Description: Make an instance to be pingable
+      FromPort: -1
+      GroupId: !Ref BastionSG
+      IpProtocol: icmp # Required
+      ToPort: -1
+  AppICMPRuleSG:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      CidrIp: 0.0.0.0/0
+      Description: Make an instance to be pingable
+      FromPort: -1
+      GroupId: !Ref AppSG
+      IpProtocol: icmp # Required
+      ToPort: -1
+  DatabaseICMPRuleSG:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      CidrIp: 0.0.0.0/0
+      Description: Make an instance to be pingable
+      FromPort: -1
+      GroupId: !Ref DatabaseSG
+      IpProtocol: icmp # Required
+      ToPort: -1
+  AppAllPortRuleSG:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      CidrIp: 0.0.0.0/0
+      Description: Enable all port
+      FromPort: 0
+      GroupId: !Ref AppSG
+      IpProtocol: tcp # Required
+      ToPort: 65535
+  DatabasePortRuleSG:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      CidrIp: 0.0.0.0/0
+      Description: Enable PostgreSQL default port
+      FromPort: 5432
+      GroupId: !Ref DatabaseSG
+      IpProtocol: tcp # Required
+      ToPort: 5432
+  DebianServerTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        DisableApiTermination: false
+        ImageId: ami-01aa83ab14b00e516
+        InstanceType: t2.micro
+        KeyName: my-access-key
+        SecurityGroupIds:
+          - !Ref AppSG
+        UserData: IyEgL2Jpbi9iYXNoCnN1ZG8gYXB0IHVwZGF0ZSAteQpzdWRvIGFwdCBpbnN0YWxsIGFwYWNoZTIgLXkKc3VkbyBzeXN0ZW1jdGwgc3RhcnQgYXBhY2hlMgpzdWRvIHN5c3RlbWN0bCBlbmFibGUgYXBhY2hlMg==
+      LaunchTemplateName: debian-server
+  # DebianDatabaseTemplate:
+  #   Type: AWS::EC2::LaunchTemplate
+  #   Properties:
+  #     LaunchTemplateData:
+  #       DisableApiTermination: false
+  #       ImageId: ami-01aa83ab14b00e516
+  #       InstanceType: t2.micro
+  #       KeyName: my-access-key
+  #       SecurityGroupIds:
+  #         - !Ref DatabaseSG
+  #       UserData:
+  #         Fn::Base64: !Sub |
+  #           #!/bin/bash
+  #           sudo apt update -y
+  #           sudo apt install postgresql postgresql-contrib -y
+  #     LaunchTemplateName: debian-postgresql
+  BastionHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: ap-southeast-1b
+      DisableApiTermination: false
+      ImageId: ami-01aa83ab14b00e516
+      InstanceType: t2.micro
+      KeyName: my-access-key
+      SecurityGroupIds:
+        - !Ref BastionSG
+      SourceDestCheck: true
+      SubnetId: !Ref PublicSubnet1B
+      Tags:
+        - Key: Name
+          Value: bastion-host
+      Tenancy: default
+  MasterDB:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: ap-southeast-1a
+      ImageId: ami-01aa83ab14b00e516
+      InstanceType: t2.micro
+      KeyName: my-access-key
+      SecurityGroupIds:
+        - !Ref DatabaseSG
+      SourceDestCheck: false
+      SubnetId: !Ref PrivateSubnet2A
+      Tags:
+        - Key: Name
+          Value: master-db
+      Tenancy: default
+      UserData:
+          Fn::Base64: 
+            !Sub |
+              #! /bin/bash
+              sudo apt update -y
+              sudo apt install postgresql postgresql-contrib -y
+  ReplicaDB:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: ap-southeast-1a
+      ImageId: ami-01aa83ab14b00e516
+      InstanceType: t2.micro
+      KeyName: my-access-key
+      SecurityGroupIds:
+        - !Ref DatabaseSG
+      SourceDestCheck: false
+      SubnetId: !Ref PrivateSubnet2A
+      Tags:
+      - Key: Name
+        Value: replica-db
+      Tenancy: default
+      UserData:
+          Fn::Base64: 
+            !Sub |
+              #! /bin/bash
+              sudo apt update -y
+              sudo apt install postgresql postgresql-contrib -y
+  SlaveDB:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: ap-southeast-1b
+      ImageId: ami-01aa83ab14b00e516
+      InstanceType: t2.micro
+      KeyName: my-access-key
+      SecurityGroupIds:
+        - !Ref DatabaseSG
+      SourceDestCheck: false
+      SubnetId: !Ref PrivateSubnet2B
+      Tags:
+      - Key: Name
+        Value: slave-db
+      Tenancy: default
+      UserData:
+          Fn::Base64: 
+            !Sub |
+              #! /bin/bash
+              sudo apt update -y
+              sudo apt install postgresql postgresql-contrib -y
+  ELB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Name: my-elb
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref ELBSG
+      SubnetMappings:
+        - SubnetId: !Ref PublicSubnet1A
+        - SubnetId: !Ref PublicSubnet1B
+      Tags:
+      - Key: Name
+        Value: alb-webapps
+      Type: application
+  TargetGroupELB:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckPath: /
+      HealthCheckPort: 80
+      HealthCheckProtocol: HTTP
+      Name: elb-target-group
+      Port: 80
+      Protocol: HTTP
+      ProtocolVersion: HTTP1
+      TargetType: instance
+      VpcId: !Ref VPC
+  ListenerELB:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+      - ELB
+      - TargetGroupELB
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroupELB
+      LoadBalancerArn: !Ref ELB
+      Port: 80
+      Protocol: HTTP
+  AutoScalingWebServer:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn: ELB
+    Properties:
+      AutoScalingGroupName: web-apps-autoscaling
+      Cooldown: '120'
+      DesiredCapacity: '2'
+      HealthCheckGracePeriod: 300
+      HealthCheckType: ELB
+      LaunchTemplate:
+        LaunchTemplateId: !Ref DebianServerTemplate
+        Version: !GetAtt DebianServerTemplate.LatestVersionNumber
+      MaxSize: '4'
+      MinSize: '1'
+      Tags:
+        - Key: Name
+          PropagateAtLaunch: true
+          Value: webapps-autoscaling
+      TargetGroupARNs:
+        - !Ref TargetGroupELB
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnet1A
+        - !Ref PrivateSubnet1B

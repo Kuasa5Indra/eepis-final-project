@@ -5,3 +5,11 @@ sudo apt update -y
 sudo apt install apache2 -y
 sudo systemctl start apache2
 sudo systemctl enable apache2
+
+
+Buat install postgresql di EC2 Instance
+https://asvignesh.in/installing-postgresql-in-aws-ubuntu-ec2-instance/
+
+#! /bin/bash
+sudo apt update -y
+sudo apt install postgresql postgresql-contrib -y
